@@ -21,41 +21,38 @@ function App() {
     audio.volume = 0.5;
     audio.preload = 'auto';
     audioRef.current = audio;
+    let started = false;
 
     const tryPlay = () => {
-      if (audio.paused) {
-        audio.play().then(() => {
-          setIsMusicPlaying(true);
-        }).catch(() => {
-          // Still blocked, will try again on next click
-        });
-      }
+      if (started) return;
+      audio.play().then(() => {
+        started = true;
+        setIsMusicPlaying(true);
+        // Clean up listeners once playing
+        document.removeEventListener('click', tryPlay, true);
+        document.removeEventListener('touchstart', tryPlay, true);
+        document.removeEventListener('pointerdown', tryPlay, true);
+      }).catch(() => {
+        // Blocked — will retry on next interaction
+      });
     };
 
-    // Try autoplay immediately
+    // Try immediately
     tryPlay();
 
-    // Keep retrying on every click/touch until it works
-    const onInteraction = () => {
-      if (audio.paused) {
-        tryPlay();
-      } else {
-        // Already playing, stop listening
-        document.removeEventListener('click', onInteraction);
-        document.removeEventListener('touchstart', onInteraction);
-      }
-    };
+    // Listen on EVERY user gesture type, in capture phase so we fire first
+    document.addEventListener('click', tryPlay, true);
+    document.addEventListener('touchstart', tryPlay, true);
+    document.addEventListener('pointerdown', tryPlay, true);
 
-    document.addEventListener('click', onInteraction);
-    document.addEventListener('touchstart', onInteraction);
-
-    // Also sync state if audio ends up playing
+    // Sync state with actual audio events
     audio.addEventListener('playing', () => setIsMusicPlaying(true));
     audio.addEventListener('pause', () => setIsMusicPlaying(false));
 
     return () => {
-      document.removeEventListener('click', onInteraction);
-      document.removeEventListener('touchstart', onInteraction);
+      document.removeEventListener('click', tryPlay, true);
+      document.removeEventListener('touchstart', tryPlay, true);
+      document.removeEventListener('pointerdown', tryPlay, true);
       audio.pause();
       audio.src = '';
     };
